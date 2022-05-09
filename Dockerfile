@@ -27,5 +27,6 @@ COPY --from=builder /project/__pypackages__/3.7/lib /project/pkgs/lib
 
 # copy files
 COPY src/ /project/src
+COPY examples/ /project/examples
 
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "80"]
