@@ -1,1 +1,4 @@
-from examples.bach_format0 import bach_format0
+from examples._230_bpm_multitrack import _230_bpm_multitrack
+from examples.beat import beat
+from examples.pitch_bend_test import pitch_bend_test
+from examples.tchaikovsky_seasons import tchaikovsky_seasons
