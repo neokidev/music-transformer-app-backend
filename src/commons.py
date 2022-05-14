@@ -1,9 +1,6 @@
 import math
 
 import numpy as np
-from note_seq import note_sequence_to_pretty_midi
-from note_seq.midi_io import note_sequence_to_pretty_midi
-from pretty_midi.containers import TimeSignature
 from tensor2tensor.data_generators import text_encoder
 
 SF2_PATH = "content/Yamaha-C5-Salamander-JNv5.1.sf2"
@@ -27,6 +24,192 @@ KEY_MAP = [
     "Bb",
     "B",
 ]
+
+INSTRUMENT_BY_PATCH_ID = [
+    "acoustic grand piano",
+    "bright acoustic piano",
+    "electric grand piano",
+    "honky-tonk piano",
+    "electric piano 1",
+    "electric piano 2",
+    "harpsichord",
+    "clavi",
+    "celesta",
+    "glockenspiel",
+    "music box",
+    "vibraphone",
+    "marimba",
+    "xylophone",
+    "tubular bells",
+    "dulcimer",
+    "drawbar organ",
+    "percussive organ",
+    "rock organ",
+    "church organ",
+    "reed organ",
+    "accordion",
+    "harmonica",
+    "tango accordion",
+    "acoustic guitar (nylon)",
+    "acoustic guitar (steel)",
+    "electric guitar (jazz)",
+    "electric guitar (clean)",
+    "electric guitar (muted)",
+    "overdriven guitar",
+    "distortion guitar",
+    "guitar harmonics",
+    "acoustic bass",
+    "electric bass (finger)",
+    "electric bass (pick)",
+    "fretless bass",
+    "slap bass 1",
+    "slap bass 2",
+    "synth bass 1",
+    "synth bass 2",
+    "violin",
+    "viola",
+    "cello",
+    "contrabass",
+    "tremolo strings",
+    "pizzicato strings",
+    "orchestral harp",
+    "timpani",
+    "string ensemble 1",
+    "string ensemble 2",
+    "synthstrings 1",
+    "synthstrings 2",
+    "choir aahs",
+    "voice oohs",
+    "synth voice",
+    "orchestra hit",
+    "trumpet",
+    "trombone",
+    "tuba",
+    "muted trumpet",
+    "french horn",
+    "brass section",
+    "synthbrass 1",
+    "synthbrass 2",
+    "soprano sax",
+    "alto sax",
+    "tenor sax",
+    "baritone sax",
+    "oboe",
+    "english horn",
+    "bassoon",
+    "clarinet",
+    "piccolo",
+    "flute",
+    "recorder",
+    "pan flute",
+    "blown bottle",
+    "shakuhachi",
+    "whistle",
+    "ocarina",
+    "lead 1 (square)",
+    "lead 2 (sawtooth)",
+    "lead 3 (calliope)",
+    "lead 4 (chiff)",
+    "lead 5 (charang)",
+    "lead 6 (voice)",
+    "lead 7 (fifths)",
+    "lead 8 (bass + lead)",
+    "pad 1 (new age)",
+    "pad 2 (warm)",
+    "pad 3 (polysynth)",
+    "pad 4 (choir)",
+    "pad 5 (bowed)",
+    "pad 6 (metallic)",
+    "pad 7 (halo)",
+    "pad 8 (sweep)",
+    "fx 1 (rain)",
+    "fx 2 (soundtrack)",
+    "fx 3 (crystal)",
+    "fx 4 (atmosphere)",
+    "fx 5 (brightness)",
+    "fx 6 (goblins)",
+    "fx 7 (echoes)",
+    "fx 8 (sci-fi)",
+    "sitar",
+    "banjo",
+    "shamisen",
+    "koto",
+    "kalimba",
+    "bag pipe",
+    "fiddle",
+    "shanai",
+    "tinkle bell",
+    "agogo",
+    "steel drums",
+    "woodblock",
+    "taiko drum",
+    "melodic tom",
+    "synth drum",
+    "reverse cymbal",
+    "guitar fret noise",
+    "breath noise",
+    "seashore",
+    "bird tweet",
+    "telephone ring",
+    "helicopter",
+    "applause",
+    "gunshot",
+]
+INSTRUMENT_FAMILY_BY_ID = [
+    "piano",
+    "chromatic percussion",
+    "organ",
+    "guitar",
+    "bass",
+    "strings",
+    "ensemble",
+    "brass",
+    "reed",
+    "pipe",
+    "synth lead",
+    "synth pad",
+    "synth effects",
+    "world",
+    "percussive",
+    "sound effects",
+]
+
+
+DRUM_KIT_BY_PATCH_ID = {
+    0: "standard kit",
+    8: "room kit",
+    16: "power kit",
+    24: "electronic kit",
+    25: "tr-808 kit",
+    32: "jazz kit",
+    40: "brush kit",
+    48: "orchestra kit",
+    56: "sound fx kit",
+}
+
+
+def _midi_to_pitch(midi):
+    octave = math.floor(midi / 12) - 1
+    return _midi_to_pitch_class(midi) + str(octave)
+
+
+def _midi_to_pitch_class(midi):
+    scale_index_to_note = [
+        "C",
+        "C#",
+        "D",
+        "D#",
+        "E",
+        "F",
+        "F#",
+        "G",
+        "G#",
+        "A",
+        "A#",
+        "B",
+    ]
+    note = midi % 12
+    return scale_index_to_note[note]
 
 
 def time_to_ticks(time, qpm, ppq):
@@ -64,7 +247,6 @@ def _time_to_tick(time, final_tick_scale, tick_to_time_map):
 
 
 def note_sequence_to_tonejs_midi_json(ns):
-    pm = note_sequence_to_pretty_midi(ns)
     ppq = ns.ticks_per_quarter
 
     tempos = []
@@ -143,14 +325,72 @@ def note_sequence_to_tonejs_midi_json(ns):
         scale = "major" if ks.mode == 0 else "minor"
         key_signatures.append({"ticks": ticks, "key": key, "scale": scale})
 
+    tracks = [
+        dict(
+            name=info.name,
+            notes=[],
+            pitchBends=[],
+            endOfTrackTicks=0,
+            controlChanges={},
+        )
+        for info in ns.instrument_infos
+    ]
+
+    for note in ns.notes:
+        time = note.start_time
+        duration = note.end_time - note.start_time
+        ticks = _time_to_tick(time, tick_scales[-1][1], tick_to_time_map)
+        durationTicks = _time_to_tick(duration, tick_scales[-1][1], tick_to_time_map)
+        velocity = note.velocity
+        midi = note.pitch
+        name = _midi_to_pitch(midi)
+
+        tracks[note.instrument]["instrument"] = (
+            {
+                "family": "drums"
+                if note.is_drum
+                else INSTRUMENT_FAMILY_BY_ID[math.floor(note.program / 8)],
+                "number": note.program,
+                "name": DRUM_KIT_BY_PATCH_ID[note.program]
+                if note.is_drum
+                else INSTRUMENT_BY_PATCH_ID[note.program],
+            },
+        )
+        tracks[note.instrument]["endOfTrackTicks"] = max(
+            tracks[note.instrument]["endOfTrackTicks"], ticks + durationTicks
+        )
+
+        tracks[note.instrument]["notes"].append(
+            {
+                "time": time,
+                "duration": duration,
+                "ticks": ticks,
+                "durationTicks": durationTicks,
+                "velocity": velocity,
+                "midi": midi,
+                "name": name,
+            }
+        )
+
+    for cc in ns.control_changes:
+        instrument = cc.instrument
+        if str(cc.control_number) not in tracks[instrument]["controlChanges"]:
+            tracks[instrument]["controlChanges"][str(cc.control_number)] = []
+
+        number = cc.control_number
+        time = cc.time
+        ticks = _time_to_tick(time, tick_scales[-1][1], tick_to_time_map)
+        value = cc.control_value / 127
+        tracks[instrument]["controlChanges"][str(cc.control_number)].append(
+            {"number": number, "ticks": ticks, "time": time, "value": value}
+        )
+
     return {
         "header": {
             "tempos": tempos,
             "timeSignatures": time_signatures,
             "keySignatures": key_signatures,
-            "meta": "not_implemented",
-            "name": "not_implemented",
             "ppq": ppq,
         },
-        "tracks": "not_implemented",
+        "tracks": tracks,
     }
