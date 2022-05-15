@@ -15,6 +15,9 @@ from examples.debussy import (
 from examples.joplin import the_entertainer
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from note_seq.midi_io import midi_file_to_note_sequence
+
+from src.commons import note_sequence_to_tonejs_midi_json
 
 app = FastAPI()
 
@@ -130,3 +133,10 @@ async def examples_prelude():
 @app.get("/examples/joplin/the-entertainer")
 async def examples_the_entertainer():
     return the_entertainer
+
+
+@app.get("/tests/bach/bach-846")
+async def tests_bach_846():
+    midi_file = "examples/bach/bach_846.mid"
+    ns = midi_file_to_note_sequence(midi_file)
+    return note_sequence_to_tonejs_midi_json(ns)
