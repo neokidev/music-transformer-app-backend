@@ -6,17 +6,13 @@ from tensor2tensor.data_generators import text_encoder
 SF2_PATH = "content/Yamaha-C5-Salamander-JNv5.1.sf2"
 SAMPLE_RATE = 16000
 
-
-KEY_MAP = [
-    # "Cb",
+_KEY_MAP = [
     "C",
-    # "C#",
     "Db",
     "D",
     "Eb",
     "E",
     "F",
-    # "F#",
     "Gb",
     "G",
     "Ab",
@@ -25,7 +21,7 @@ KEY_MAP = [
     "B",
 ]
 
-INSTRUMENT_BY_PATCH_ID = [
+_INSTRUMENT_BY_PATCH_ID = [
     "acoustic grand piano",
     "bright acoustic piano",
     "electric grand piano",
@@ -155,7 +151,8 @@ INSTRUMENT_BY_PATCH_ID = [
     "applause",
     "gunshot",
 ]
-INSTRUMENT_FAMILY_BY_ID = [
+
+_INSTRUMENT_FAMILY_BY_ID = [
     "piano",
     "chromatic percussion",
     "organ",
@@ -174,8 +171,7 @@ INSTRUMENT_FAMILY_BY_ID = [
     "sound effects",
 ]
 
-
-DRUM_KIT_BY_PATCH_ID = {
+_DRUM_KIT_BY_PATCH_ID = {
     0: "standard kit",
     8: "room kit",
     16: "power kit",
@@ -212,19 +208,11 @@ def _midi_to_pitch_class(midi):
     return scale_index_to_note[note]
 
 
-def time_to_ticks(time, qpm, ppq):
+def _time_to_ticks(time, qpm, ppq):
     return round(((time * qpm) / 60.0) * ppq)
 
 
-# Decode a list of IDs.
-def decode(ids, encoder):
-    ids = list(ids)
-    if text_encoder.EOS_ID in ids:
-        ids = ids[: ids.index(text_encoder.EOS_ID)]
-    return encoder.decode(ids)
-
-
-def _time_to_tick(time, final_tick_scale, tick_to_time_map):
+def _time_to_ticks_by_map(time, final_tick_scale, tick_to_time_map):
     # Find the index of the ticktime which is smaller than time
     tick = np.searchsorted(tick_to_time_map, time, side="left")
     # If the closest tick was the final tick in tick_to_time_map...
@@ -241,9 +229,17 @@ def _time_to_tick(time, final_tick_scale, tick_to_time_map):
         < math.fabs(time - tick_to_time_map[tick])
     ):
         # Decrement index by 1
-        return tick - 1
+        return tick.item() - 1
     else:
-        return tick
+        return tick.item()
+
+
+# Decode a list of IDs.
+def decode(ids, encoder):
+    ids = list(ids)
+    if text_encoder.EOS_ID in ids:
+        ids = ids[: ids.index(text_encoder.EOS_ID)]
+    return encoder.decode(ids)
 
 
 def note_sequence_to_tonejs_midi_json(ns):
@@ -254,7 +250,7 @@ def note_sequence_to_tonejs_midi_json(ns):
     tick_scales = [(0, 60.0 / (120.0 * ppq))]
     for i, tempo in enumerate(ns.tempos):
         if i > 0:
-            current_ticks += time_to_ticks(
+            current_ticks += _time_to_ticks(
                 tempo.time - ns.tempos[i - 1].time,
                 ns.tempos[i - 1].qpm,
                 ppq,
@@ -278,7 +274,7 @@ def note_sequence_to_tonejs_midi_json(ns):
     )
 
     total_quantized_steps = (
-        time_to_ticks(total_time - ns.tempos[-1].time, ns.tempos[-1].qpm, ppq)
+        _time_to_ticks(total_time - ns.tempos[-1].time, ns.tempos[-1].qpm, ppq)
         + tempos[-1]["ticks"]
     )
 
@@ -298,7 +294,7 @@ def note_sequence_to_tonejs_midi_json(ns):
 
     time_signatures = []
     for i, ts in enumerate(ns.time_signatures):
-        ticks = _time_to_tick(ts.time, tick_scales[-1][1], tick_to_time_map)
+        ticks = _time_to_ticks_by_map(ts.time, tick_scales[-1][1], tick_to_time_map)
 
         time_signatures.append(
             {"ticks": ticks, "timeSignature": [ts.numerator, ts.denominator]}
@@ -320,45 +316,45 @@ def note_sequence_to_tonejs_midi_json(ns):
 
     key_signatures = []
     for i, ks in enumerate(ns.key_signatures):
-        ticks = _time_to_tick(ks.time, tick_scales[-1][1], tick_to_time_map)
-        key = KEY_MAP[ks.key]
+        ticks = _time_to_ticks_by_map(ks.time, tick_scales[-1][1], tick_to_time_map)
+        key = _KEY_MAP[ks.key]
         scale = "major" if ks.mode == 0 else "minor"
         key_signatures.append({"ticks": ticks, "key": key, "scale": scale})
 
-    tracks = [
-        dict(
-            name=info.name,
-            notes=[],
-            pitchBends=[],
-            endOfTrackTicks=0,
-            controlChanges={},
-        )
-        for info in ns.instrument_infos
-    ]
+    if ns.instrument_infos:
+        tracks = [
+            dict(
+                name=info.name,
+                notes=[],
+                pitchBends=[],
+                endOfTrackTicks=0,
+                controlChanges={},
+            )
+            for info in ns.instrument_infos
+        ]
+    else:
+        num_tracks = max(map(lambda n: n.instrument, ns.notes)) + 1
+        tracks = [
+            dict(
+                name="",
+                notes=[],
+                pitchBends=[],
+                endOfTrackTicks=0,
+                controlChanges={},
+            )
+            for _ in range(num_tracks)
+        ]
 
     for note in ns.notes:
         time = note.start_time
         duration = note.end_time - note.start_time
-        ticks = _time_to_tick(time, tick_scales[-1][1], tick_to_time_map)
-        durationTicks = _time_to_tick(duration, tick_scales[-1][1], tick_to_time_map)
-        velocity = note.velocity
+        ticks = _time_to_ticks_by_map(time, tick_scales[-1][1], tick_to_time_map)
+        durationTicks = _time_to_ticks_by_map(
+            duration, tick_scales[-1][1], tick_to_time_map
+        )
+        velocity = note.velocity / 127
         midi = note.pitch
         name = _midi_to_pitch(midi)
-
-        tracks[note.instrument]["instrument"] = (
-            {
-                "family": "drums"
-                if note.is_drum
-                else INSTRUMENT_FAMILY_BY_ID[math.floor(note.program / 8)],
-                "number": note.program,
-                "name": DRUM_KIT_BY_PATCH_ID[note.program]
-                if note.is_drum
-                else INSTRUMENT_BY_PATCH_ID[note.program],
-            },
-        )
-        tracks[note.instrument]["endOfTrackTicks"] = max(
-            tracks[note.instrument]["endOfTrackTicks"], ticks + durationTicks
-        )
 
         tracks[note.instrument]["notes"].append(
             {
@@ -372,6 +368,28 @@ def note_sequence_to_tonejs_midi_json(ns):
             }
         )
 
+        instrument_family = (
+            "drums"
+            if note.is_drum
+            else _INSTRUMENT_FAMILY_BY_ID[math.floor(note.program / 8)]
+        )
+        instrument_number = note.program
+        instrument_name = (
+            _DRUM_KIT_BY_PATCH_ID[note.program]
+            if note.is_drum
+            else _INSTRUMENT_BY_PATCH_ID[note.program]
+        )
+
+        tracks[note.instrument]["instrument"] = {
+            "family": instrument_family,
+            "number": instrument_number,
+            "name": instrument_name,
+        }
+
+        tracks[note.instrument]["endOfTrackTicks"] = max(
+            tracks[note.instrument]["endOfTrackTicks"], ticks + durationTicks
+        )
+
     for cc in ns.control_changes:
         instrument = cc.instrument
         if str(cc.control_number) not in tracks[instrument]["controlChanges"]:
@@ -379,7 +397,7 @@ def note_sequence_to_tonejs_midi_json(ns):
 
         number = cc.control_number
         time = cc.time
-        ticks = _time_to_tick(time, tick_scales[-1][1], tick_to_time_map)
+        ticks = _time_to_ticks_by_map(time, tick_scales[-1][1], tick_to_time_map)
         value = cc.control_value / 127
         tracks[instrument]["controlChanges"][str(cc.control_number)].append(
             {"number": number, "ticks": ticks, "time": time, "value": value}
@@ -387,10 +405,12 @@ def note_sequence_to_tonejs_midi_json(ns):
 
     return {
         "header": {
+            "name": "",
             "tempos": tempos,
             "timeSignatures": time_signatures,
             "keySignatures": key_signatures,
             "ppq": ppq,
+            "meta": [],
         },
         "tracks": tracks,
     }
