@@ -32,7 +32,7 @@ async def root():
     return {"message": "Hello World"}
 
 
-@app.get("/examples/230_bpm_multitrack")
+@app.get("/examples/230-bpm-multitrack")
 async def examples_230_bpm_multitrack():
     return _230_bpm_multitrack
 
