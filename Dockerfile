@@ -29,4 +29,7 @@ COPY --from=builder /project/__pypackages__/3.7/lib /project/pkgs/lib
 COPY src/ /project/src
 COPY examples/ /project/examples
 
+RUN apt-get update -y
+RUN apt-get install libsndfile1 -y
+
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "80"]
