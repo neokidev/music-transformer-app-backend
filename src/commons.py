@@ -268,9 +268,9 @@ def note_sequence_to_tonejs_midi_json(ns):
 
     total_time = max(
         ns.total_time,
-        ns.time_signatures[-1].time,
-        ns.key_signatures[-1].time,
-        ns.tempos[-1].time,
+        ns.time_signatures[-1].time if ns.time_signatures else 0,
+        ns.key_signatures[-1].time if ns.key_signatures else 0,
+        ns.tempos[-1].time if ns.tempos else 0,
     )
 
     total_quantized_steps = (

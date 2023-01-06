@@ -1,23 +1,19 @@
-from examples import _230_bpm_multitrack, beat, pitch_bend_test, tchaikovsky_seasons
-from examples.bach import bach_846, bach_847, bach_850, bach_format0
-from examples.beethoven import symphony_7_2, symphony_7_2_singletrack
-from examples.debussy import (
-    childrens_corner_1,
-    childrens_corner_2,
-    childrens_corner_3,
-    childrens_corner_4,
-    childrens_corner_5,
-    claire_de_lune,
-    menuet,
-    passepied,
-    prelude,
-)
-from examples.joplin import the_entertainer
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from note_seq.midi_io import midi_file_to_note_sequence
 
+from examples import (_230_bpm_multitrack, beat, pitch_bend_test,
+                      tchaikovsky_seasons)
+from examples.bach import bach_846, bach_847, bach_850, bach_format0
+from examples.beethoven import symphony_7_2, symphony_7_2_singletrack
+from examples.debussy import (childrens_corner_1, childrens_corner_2,
+                              childrens_corner_3, childrens_corner_4,
+                              childrens_corner_5, claire_de_lune, menuet,
+                              passepied, prelude)
+from examples.joplin import the_entertainer
 from src.commons import note_sequence_to_tonejs_midi_json
+from src.generate_from_unconditional_model import \
+    generate_from_unconditional_model as generate_from_unconditional_model_fn
 
 app = FastAPI()
 
@@ -140,3 +136,8 @@ async def tests_bach_846():
     midi_file = "examples/bach/bach_846.mid"
     ns = midi_file_to_note_sequence(midi_file)
     return note_sequence_to_tonejs_midi_json(ns)
+
+
+@app.get("/generate-from-unconditional-model")
+async def generate_from_unconditional_model():
+    return generate_from_unconditional_model_fn()
