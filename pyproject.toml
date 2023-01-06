@@ -2,9 +2,7 @@
 name = ""
 version = ""
 description = ""
-authors = [
-    {name = "ot07", email = "ot07neoki@gmail.com"},
-]
+authors = [{ name = "ot07", email = "ot07neoki@gmail.com" }]
 dependencies = [
     "fastapi==0.76.0",
     "gym==0.17.3",
@@ -18,20 +16,24 @@ dependencies = [
 ]
 requires-python = ">=3.7"
 readme = "README.md"
-license = {text = "MIT"}
+license = { text = "MIT" }
 [project.optional-dependencies]
 
 [tool.pdm]
 
 [tool.pdm.scripts]
-start = "uvicorn src.main:app --reload"
+start = "uvicorn src.main:app --reload --host 0.0.0.0"
+test = "pytest tests/test_commons.py"
 
 [tool.pdm.dev-dependencies]
-dev = [
-    "black>=22.3.0",
-    "flake8>=4.0.1",
-    "isort>=5.10.1",
-]
+dev = ["black>=22.3.0", "flake8>=4.0.1", "isort>=5.10.1", "pytest>=7.1.2"]
 [build-system]
 requires = ["pdm-pep517>=0.12.0"]
 build-backend = "pdm.pep517.api"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    'ignore::DeprecationWarning',
+    'ignore::numba.core.errors.NumbaDeprecationWarning',
+    'ignore::RuntimeWarning'
+]
